@@ -35,14 +35,54 @@ If you plan on running locally you will need to create a SQL Server db. The proj
 3. Hit F5 to start debugging, or open a command prompt in the folder where the FSharp.Interview.SqlProvider.Api.jsproj is and typing 'dotnet run'
 4. Open **https://localhost:[your port]/swagger/index.html** to see the Swagger definitions and to try stuff out for yourself. I prefer Postman, but that is just me..
 
+#
+<h1>FSharp.FunctionApp.PubEvents</h1>
+
+This is an example Azure Function written in F#. The Function App has one Http Trigger the and expects the following json object:
+
+    {
+	"eventType": "your-event-type",
+	"eventSubject": "the event subject",
+	"eventId": "[Optional - If not provided will create a GUID]",
+	"body": {
+         [Any valid json object for example:]
+          "customerName": "John Smith"
+          "orders": "[
+              "order-1",
+              "order-2",
+              "order-3"
+          ]
+        }
+    }
+
+The function app will look at the "Topic-Key" and "Topic-Host" headers and publish an Event Grid event.
+
+<h2>Local set up</h2>
+
+ Open a command prompt and run the following command:
+   
+    npm install -g azure-functions-core-tools
+
+
+ 1. In your Azure Portal create an Event Grid Topic
+ 2. Go to the Overview blade of the Topic you created and copy the Topic Endpoint. Remove the "https://" prefix and any "/api/events suffix so you are left with something like 'topic-your-topic-name.centralus-1.eventgrid.azure.net'
+ 3. Go to to the 'Access keys' blade an copy one of the two Keys
+ 4. Open any tool to create an http POST (I like Postman) to             http://localhost:7071/api/pub-event. 
+ 5. Add the following three headers key/value to the POST:
+    1. Content-Type / application/json 
+    2. Topic-Host  /    "topic-your-topic-name.centralus-1.eventgrid.azure.net"
+    3. Topic-Key / (Key from Step 3)
+ 6. If your are using Visual Studio you can just hit F5 to start debugging. You can also open a command prompt and type 'func start --build' in the project's folder
+ 7. Make the POST using your tool
+ 8. Verify event was published by viewing metrics on the 'Overview' blade of your Event Grid Topic
+
+
 <h2>Notes</h2>
 
-A couple of years ago I had to do this project in C# as part of the application process to a major US company. Since then I have learned F# on my own time and thought it would be a great learning experience to rewrite the original C# project in F#. It was! A couple of interesting tidbits:
+A couple of years ago I had to do the 'FSharp.Interview.SqlProvider.Api' project in C# and Entity Framework as part of the application process to a major US company. Since then I have learned F# on my own time and thought it would be a great learning experience to rewrite the original C# project in F#. It was! A couple of interesting tidbits:
 
-1. The C# version had approx, 1600 lines of code and 18 files (those seperate code files just for interface add upp lol!)
+1. The C# version had approx, 1600 lines of code and 18 files (those seperate code files just for interface add up lol!)
 2. The F# version has approx 800 lines of code and only 3 files!
-
-Anyway, I've learned F# on my own... 
 
 So... if you have any suggestions on how things could be done better
 
