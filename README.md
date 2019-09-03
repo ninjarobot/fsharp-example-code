@@ -3,11 +3,11 @@ Personal F# Code I've developed.
 #
 <h1>FSharp.Interview.SqlProvider.Api</h1>
 
-<h3>Calculate employee's paycheck after deductions for employee benefits. Show paycheck gross, Deduction amount, Discount amount (if any), paycheck net </h3>
+<h3>Calculate employee's paycheck after deductions for employee benefits</h3>
 
 Business rules:
 
-1. Employee is paid twice a month so recieves 24 paychecks/year
+1. Employee recieves 24 paychecks/year
 2. Employee deduction: $5000/year (not optional)
 3. Each dependent for employee costs $1000/year
 4. Employee can have 0 dependents and a maximum  of 10 dependents
