@@ -63,7 +63,7 @@ module SqlProviderContext =
                     | None  -> Error(NotFound (nfm))
                 | Choice2Of2 ex -> Error(SqlException (FriendlyMessage fm, ExceptionMessage ex.Message))
             return result
-         } |> Async.RunSynchronously
+         }
 
     let queryForEmployeeById empId  = 
          query {
@@ -343,12 +343,15 @@ module UpdateSalary =
     
         } |> Async.RunSynchronously
     
-    let updateSalary (usd: UpdateSalaryData) = 
-        Ok (usd) 
-        |> Result.bind validateUpdatedSalary
-        |> Result.bind getEmployeeInfo
-        |> Result.bind calculateNewPaycheck
-        |> Result.bind updateSalaryAsync
+    let updateSalary (usd: UpdateSalaryData) =
+        async {
+            return!
+                Ok (usd) 
+                |> Result.bind validateUpdatedSalary
+                |> Result.bind getEmployeeInfo
+                |> Result.bind calculateNewPaycheck
+                |> Result.bind updateSalaryAsync
+        }
 
 module AddDependent =
 
@@ -482,17 +485,14 @@ module DeleteDependent =
                 let row = context.Dbo.Dependent.Create()
                 row.Id <- dependentId
                 row.Delete()
-                let! submitAsynch = context.SubmitUpdatesAsync() |> Async.Catch //|> Async.RunSynchronously 
-                let result = 
-                    match submitAsynch with
-                    | Choice1Of2 _ -> Ok(dep.EmployeeId)
-                    | Choice2Of2 ex -> 
-                        context.ClearUpdates |> ignore
-                        Error(DbFailure(SqlException(FriendlyMessage "There was a serious error deleting dependent. Please contact system administrator.", ExceptionMessage ex.Message)))
-                return result
+                match! context.SubmitUpdatesAsync() |> Async.Catch with
+                | Choice1Of2 _ -> return Ok(dep.EmployeeId)
+                | Choice2Of2 ex -> 
+                    context.ClearUpdates |> ignore
+                    return Error(DbFailure(SqlException(FriendlyMessage "There was a serious error deleting dependent. Please contact system administrator.", ExceptionMessage ex.Message)))
         
             | None -> return Error(DbFailure(NotFound(sprintf "Dependent not found for provided Id: %d" dependentId)))
-        } |> Async.RunSynchronously
+        }
 
     let queryAnnualSalaryForEmp empId  = 
               query {
@@ -501,17 +501,17 @@ module DeleteDependent =
                       select (employee.AnnualSalary)
               }
 
-    let getUpdateSalaryData empId = 
-        let nfm = sprintf "Employee not found for provided Id: %d" empId
-        let fm = sprintf "There was an SQL error fetching annaual salary for provided Id: %d" empId
-        let result =  empId |> queryAnnualSalaryForEmp |> fetchOneAsync nfm fm
-        match (result) with
-        | Ok(asal) ->  Ok(Id empId, NewSalary (asal |> float))
-        | Error(fail) -> Error(DbFailure fail)
+    let getUpdateSalaryData empId =
+        async {
+            let nfm = sprintf "Employee not found for provided Id: %d" empId
+            let fm = sprintf "There was an SQL error fetching annaual salary for provided Id: %d" empId
+            match! empId |> queryAnnualSalaryForEmp |> fetchOneAsync nfm fm with
+            | Ok(asal) ->  return Ok(Id empId, NewSalary (asal |> float))
+            | Error(fail) -> return Error(DbFailure fail)
+        }
 
 
-    let updateSalary (usd: UpdateSalaryData) = 
-        usd |> UpdateSalary.updateSalary
+    let updateSalary = UpdateSalary.updateSalary
 
     let getUpdatedEmployee (emp: Employee) =
         let (Id id, _, _,_) = emp
@@ -519,12 +519,20 @@ module DeleteDependent =
         | Ok(emp) ->  Ok(emp)
         | Error(fail) -> Error(DbFailure fail)
 
-    let deleteDependent dependentId = 
-        Ok(dependentId) 
-        |> Result.bind deleteDependentAsync
-        |> Result.bind getUpdateSalaryData
-        |> Result.bind updateSalary
-        |> Result.bind getUpdatedEmployee
+    let deleteDependent dependentId =
+        async {
+            match! deleteDependentAsync dependentId with
+            | Error err -> return Error err
+            | Ok dependentId ->
+                match! getUpdateSalaryData dependentId with
+                | Error err -> return Error err
+                | Ok dependentId ->
+                    match! updateSalary dependentId with
+                    | Error err -> return Error err
+                    | Ok dependentId ->
+                        return getUpdatedEmployee dependentId
+                        
+        }
 
 module DeleteEmployee =
 
@@ -702,10 +710,12 @@ module EmployeeResponses =
             |> okResponse "Get salary information successful"
         | Error(dbex) -> dbex |> dbFailure
 
-    let getUpdateSalaryResponse (usd: UpdateSalaryData) = 
-        match (usd |> updateSalary) with
-        | Ok (emps) -> emps |> toSalaryInfoResult |> okResponse "Update salary operation successful"
-        | Error(dbex) -> dbex |> operationFailureResponse
+    let getUpdateSalaryResponse (usd: UpdateSalaryData) =
+        async {
+            match! usd |> updateSalary with
+            | Ok (emps) -> return emps |> toSalaryInfoResult |> okResponse "Update salary operation successful"
+            | Error(dbex) -> return dbex |> operationFailureResponse
+        }
 
     let getAddEmployeeResponse (aed: AddEmployeeData) = 
         match (aed |> addEmployee ) with

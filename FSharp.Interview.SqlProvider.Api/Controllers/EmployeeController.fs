@@ -24,10 +24,12 @@ type EmployeeController ()  =
 
     [<HttpPut("update-salary")>]
     member __.UpdateSalary([<FromBody>] updateSalaryRequest : UpdateSalaryRequest) =
-        let id = Id updateSalaryRequest.Id
-        let ns = NewSalary (updateSalaryRequest.Salary |> float)
-        let response = UpdateSalaryData (id, ns) |> getUpdateSalaryResponse
-        ActionResult<StandardResponse>(__.StatusCode(response.StatusCode, response))
+        async {
+            let id = Id updateSalaryRequest.Id
+            let ns = NewSalary (updateSalaryRequest.Salary |> float)
+            let! response = UpdateSalaryData (id, ns) |> getUpdateSalaryResponse
+            return ActionResult<StandardResponse>(__.StatusCode(response.StatusCode, response))
+        } |> Async.StartAsTask
 
     [<HttpPost("add")>]
     member __.AddEmployee([<FromBody>] addEmployeeRequest : AddEmployeeRequest) =
